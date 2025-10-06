@@ -437,9 +437,15 @@ export default function HomeContent() {
             <EditLocationsImageButton />
           </>
         ) : (
-          <Button onClick={() => navigate("/signin")} className="rounded-full">
-            Sign in
-          </Button>
+          <div>
+            <span>To add your favorite locations: </span>
+            <Button
+              onClick={() => navigate("/signin")}
+              className="rounded-full"
+            >
+              Sign in
+            </Button>
+          </div>
         )}
       </div>
 
