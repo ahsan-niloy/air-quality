@@ -10,10 +10,12 @@ import HeatMap from "./pages/HeatMap";
 import Profile from "./pages/Profile";
 import AQHistory from "./pages/AQHistory";
 import PrivateRoute from "./Provider/PrivateRoute";
+import HomeContent from "./components/HomeContent";
 
 const routes = (
   <Routes>
     <Route path="/" element={<Home />}>
+      <Route index element={<HomeContent />} />
       <Route path="heatmap" element={<HeatMap />} />
       <Route
         path="profile"

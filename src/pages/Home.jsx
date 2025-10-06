@@ -3,6 +3,7 @@ import BottomNavbar from "../components/bottomNavbar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useContext } from "react";
 import { AuthContext } from "../Provider/AuthProvider";
+import HomeContent from "../components/HomeContent";
 
 function Home() {
   const { user, loading, signOutUser } = useContext(AuthContext);
@@ -25,7 +26,6 @@ function Home() {
           </Avatar>
         </div>
       </div>
-
       <Outlet />
       <BottomNavbar />
     </div>
