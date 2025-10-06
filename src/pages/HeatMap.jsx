@@ -125,7 +125,7 @@ export default function HeatMap() {
     });
 
     map.on("error", (e) => {
-      console.error("Mapbox error:", e?.error || e);
+     
       setStatus((s) => ({ ...s, error: "Mapbox error (see console)" }));
     });
 
@@ -144,16 +144,16 @@ export default function HeatMap() {
       for (const src of FIRMS_SOURCES) {
         try {
           const url = firmsUrl(src);
-          console.log("[FIRMS] fetching:", src, url);
+          
           const res = await fetch(url);
           if (!res.ok) {
             console.warn(`[FIRMS] ${src} HTTP ${res.status}`);
             continue;
           }
           const text = await res.text();
-          console.log(`[FIRMS] ${src} head:`, text.slice(0, 200));
+
           const geo = csvToGeoJSON(text);
-          console.log(`[FIRMS] ${src} detections:`, geo.features.length);
+          
           combined = combined.concat(geo.features);
           anyOk = true;
         } catch (e) {
@@ -175,10 +175,10 @@ export default function HeatMap() {
       const geojson = { type: "FeatureCollection", features };
 
       // Console logs
-      console.log(`FIRMS detections (multi-sensor, NA, last ${FIRMS_DAYS} day):`, geojson.features.length);
+      
       geojson.features.forEach((f, i) => {
         const [lon, lat] = f.geometry.coordinates;
-        console.log(`#${i + 1}`, { lon, lat });
+        
       });
       console.table(
         geojson.features.slice(0, 200).map((f) => {
@@ -285,7 +285,7 @@ export default function HeatMap() {
         map.on("mouseleave", "fires-unclustered", () => (map.getCanvas().style.cursor = ""));
       }
     } catch (err) {
-      console.error("FIRMS load error:", err);
+      
       setStatus((s) => ({ ...s, firms: "error", error: "FIRMS load error (see console)" }));
     }
   }

@@ -2,26 +2,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthContext } from "../Provider/AuthProvider";
 import { useContext } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 function SignIn() {
   const { user, signInUser } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || "/";
+
 
   const signIn = (e) => {
     e.preventDefault();
-    console.log("Sign In");
+
     const form = e.target;
     const email = form.email.value;
     const password = form.password.value;
-    console.log(email, password);
+
     signInUser(email, password)
       .then((result) => {
         const loggedUser = result.user;
-        console.log(loggedUser);
+        navigate(from, { replace: true });
         form.reset();
       })
       .catch((error) => {
-        console.log(error);
+
       });
   };
   return (

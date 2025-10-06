@@ -13,7 +13,7 @@ function PrivateRoute({ children }) {
     return <div>Loading...</div>;
   }
 
-  return <Navigate to="/login" state={{ from: location }} replace></Navigate>;
+  return <Navigate to="/signin" state={{ from: location }} replace></Navigate>;
 }
 
 export default PrivateRoute;

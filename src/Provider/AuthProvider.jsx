@@ -6,6 +6,7 @@ import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { db } from "../Firebase/firebase.init";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 
+
 export const AuthContext = createContext(null);
 function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
@@ -32,11 +33,17 @@ function AuthProvider({ children }) {
     return cred;
   };
 
+  const signOutUser = () => {
+    setLoading(true);
+    return auth.signOut();
+  };  
+
   const authInfo = {
     user,
     loading,
     signInUser,
     signUpUser,
+    signOutUser,
   };
 
   useEffect(() => {
