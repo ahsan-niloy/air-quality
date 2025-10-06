@@ -11,11 +11,15 @@ import Profile from "./pages/Profile";
 import AQHistory from "./pages/AQHistory";
 import PrivateRoute from "./Provider/PrivateRoute";
 import HomeContent from "./components/HomeContent";
+import NewLocationPage from "./app/locations/new/page";
+import ManageLocationsPage from "./app/locations/manage/page";
 
 const routes = (
   <Routes>
     <Route path="/" element={<Home />}>
       <Route index element={<HomeContent />} />
+      <Route path="/locations/new" element={<NewLocationPage />} />
+      <Route path="/locations/manage" element={<ManageLocationsPage />} />
       <Route path="heatmap" element={<HeatMap />} />
       <Route
         path="profile"
