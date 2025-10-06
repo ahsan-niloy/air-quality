@@ -29,17 +29,10 @@ const routes = (
           </PrivateRoute>
         }
       />
-      <Route
-        path="aqhistory"
-        element={
-          <PrivateRoute>
-            <AQHistory />
-          </PrivateRoute>
-        }
-      />
     </Route>
 
     <Route path="/signin" element={<SignIn></SignIn>} />
+    <Route path="/login" element={<SignIn></SignIn>} />
     <Route path="/signup" element={<SignUp></SignUp>} />
     <Route path="*" element={<h1>Not found</h1>} />
   </Routes>

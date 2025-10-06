@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+// src/app/locations/new/page.jsx  (or wherever your NewLocationPage lives)
+import { useContext, useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +8,13 @@ import { Label } from "@/components/ui/label";
 import { geocodeCity } from "@/lib/geocode";
 import { addPlaceDB } from "@/lib/placesStore";
 import { db } from "@/src/Firebase/firebase.init";
+import { AuthContext } from "@/src/Provider/AuthProvider";
 
-/** Pass the signed-in user down or get from your auth context */
-export default function NewLocationPage({ user }) {
+export default function NewLocationPage() {
+  const { user, loading: authLoading } = useContext(AuthContext) || {};
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -69,24 +73,40 @@ export default function NewLocationPage({ user }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!selected) return;
+
+    // If auth still initializing, do nothing yet
+    if (authLoading) return;
+
+    // If not signed in, send them to signin and preserve return URL
     if (!user?.uid) {
-      alert("Please sign in to save locations.");
+      navigate(`/signin?next=${encodeURIComponent(location.pathname)}`);
       return;
     }
+
     await addPlaceDB(db, user.uid, selected);
     navigate("/locations/manage");
   };
+
+  const canSave = !!selected && !authLoading && !!user?.uid;
 
   return (
     <div className="max-w-md mx-auto p-4">
       <Card>
         <CardHeader>
-          <CardTitle>Add a location</CardTitle>
+          <CardTitle>Add a North America location</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
+            {/* If not signed in, nudge them */}
+            {!authLoading && !user?.uid && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 text-sm mb-2">
+                You’re not signed in. You can search, but you’ll need to sign in
+                to save.
+              </div>
+            )}
+
             <div>
-              <Label>City</Label>
+              <Label className="mb-2">City</Label>
               <Input
                 value={query}
                 onChange={(e) => {
@@ -135,8 +155,8 @@ export default function NewLocationPage({ user }) {
               >
                 {busy ? "Working…" : "Use current location"}
               </Button>
-              <Button type="submit" disabled={!selected}>
-                Save
+              <Button type="submit" disabled={!canSave}>
+                {user?.uid ? "Save" : "Sign in to save"}
               </Button>
               <Button
                 type="button"

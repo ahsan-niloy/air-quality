@@ -1,4 +1,8 @@
-import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
 import { auth } from "../Firebase/firebase.init";
 import React, { useEffect } from "react";
 import { createContext, useState } from "react";
@@ -32,11 +36,17 @@ function AuthProvider({ children }) {
     return cred;
   };
 
+  const signOutUser = () => {
+    setLoading(true);
+    return signOut(auth);
+  };
+
   const authInfo = {
     user,
     loading,
     signInUser,
     signUpUser,
+    signOutUser,
   };
 
   useEffect(() => {

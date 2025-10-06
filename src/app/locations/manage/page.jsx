@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { geocodeCity } from "@/lib/geocode";
 import { db } from "@/src/Firebase/firebase.init";
+import { AuthContext } from "@/src/Provider/AuthProvider";
+
 import {
   loadPlacesDB,
   updatePlaceDB,
@@ -14,7 +16,8 @@ import {
 } from "@/lib/placesStore";
 
 /** Pass the signed-in user down or get from your auth context */
-export default function ManageLocationsPage({ user }) {
+export default function ManageLocationsPage() {
+  const { user, loading: authLoading } = useContext(AuthContext) || {};
   const navigate = useNavigate();
   const [places, setPlaces] = useState([]); // [{id?, name, subtitle, lat, lon}]
   const [initial, setInitial] = useState([]); // snapshot for comparison if needed

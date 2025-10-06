@@ -7,6 +7,7 @@ import { db } from "@/src/Firebase/firebase.init";
 import { loadPlacesDB } from "@/lib/placesStore";
 import { Button } from "@/components/ui/button";
 import { AuthContext } from "@/src/Provider/AuthProvider";
+import HeatMap from "@/src/pages/HeatMap";
 
 /* ----------------- utilities ----------------- */
 const km = (a, b) => {
@@ -425,11 +426,9 @@ export default function HomeContent() {
 
   return (
     <div className="p-3 mb-10 max-w-xl mx-auto">
-      {/* Replace with Mapbox/Globe later */}
-      <div className="mb-4 rounded-2xl h-40 bg-[#e8f3e8] border border-green-200 flex items-center justify-center text-sm text-green-700">
-        Map / Globe goes here
+      <div className="mb-4">
+        <HeatMap heightClass="h-40" showStatus={false} />
       </div>
-
       {/* Top action: show Add/Edit if signed in, otherwise a Sign in button */}
       <div className="flex justify-end items-center gap-3 mb-3">
         {user?.uid ? (

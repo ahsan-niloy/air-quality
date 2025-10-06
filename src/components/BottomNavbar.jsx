@@ -5,8 +5,6 @@ import {
   HomeSolid,
   Earth,
   EarthSolid,
-  Archive,
-  ArchiveSolid,
   User,
   UserSolid,
 } from "@mynaui/icons-react";
@@ -15,12 +13,7 @@ import { NavLink } from "react-router-dom";
 const TABS = [
   { key: "home", label: "Home", Outline: Home, Solid: HomeSolid },
   { key: "heatmap", label: "Heat Map", Outline: Earth, Solid: EarthSolid },
-  {
-    key: "aqhistory",
-    label: "AQ History",
-    Outline: Archive,
-    Solid: ArchiveSolid,
-  },
+
   { key: "profile", label: "Profile", Outline: User, Solid: UserSolid },
 ];
 
@@ -33,7 +26,7 @@ export default function BottomNavbar() {
                  dark:bg-neutral-900/80 dark:border-neutral-800"
       aria-label="Bottom Navigation"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-4">
+      <ul className="mx-auto grid max-w-md grid-cols-3">
         {TABS.map(({ key, label, Outline, Solid }) => {
           const isActive = key === active;
           const Icon = isActive ? Solid : Outline;

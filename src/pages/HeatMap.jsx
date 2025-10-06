@@ -8,7 +8,7 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 // Clamp to North America [west, south, east, north]
 const NA_BOUNDS = [-170, 5, -30, 85];
 
-// ---- FIRMS CONFIG: multi-sensor; last 3 days (your current value) ----
+// ---- FIRMS CONFIG ----
 const FIRMS_SOURCES = [
   "VIIRS_SNPP_NRT",
   "VIIRS_NOAA21_NRT",
@@ -16,7 +16,7 @@ const FIRMS_SOURCES = [
   "MODIS_NRT",
 ];
 const FIRMS_DAYS = 3; // last 3 days
-const BBOX = "-170,5,-30,80"; // North America W,S,E,N
+const BBOX = "-170,5,-30,80"; // NA W,S,E,N
 
 function firmsUrl(source) {
   return `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${
@@ -24,9 +24,7 @@ function firmsUrl(source) {
   }/${source}/${BBOX}/${FIRMS_DAYS}`;
 }
 
-/* ================== Mapbox style expressions (pulled out to constants) ================== */
-
-// Color by FRP (unchanged)
+/* ============= style expressions ============= */
 const INTENSITY_COLOR = [
   "interpolate",
   ["linear"],
@@ -42,8 +40,6 @@ const INTENSITY_COLOR = [
   120,
   "#b91c1c",
 ];
-
-// Stroke color by FRP (unchanged)
 const INTENSITY_STROKE = [
   "interpolate",
   ["linear"],
@@ -57,36 +53,33 @@ const INTENSITY_STROKE = [
   120,
   "#7f1d1d",
 ];
-
-// 🔵 Bigger circles for lower intensity:
-// radius(px) = base_by_zoom + k_by_zoom * sqrt(max(1, FRP))
-// This guarantees even FRP≈0 points have a decent size.
 const FRP_SAFE = ["to-number", ["coalesce", ["get", "frp"], 1]];
 const SQRT_FRP = ["sqrt", ["max", 1, FRP_SAFE]];
-
 const INTENSITY_RADIUS = [
   "interpolate",
   ["linear"],
   ["zoom"],
-  //   zoom,   base + k * sqrt(FRP)
   2,
-  ["+", 6, ["*", 0.8, SQRT_FRP]], // base 6px at z2  (↑ from ~0.8 earlier)
+  ["+", 6, ["*", 0.8, SQRT_FRP]],
   4,
-  ["+", 8, ["*", 1.1, SQRT_FRP]], // base 8px
+  ["+", 8, ["*", 1.1, SQRT_FRP]],
   6,
-  ["+", 10, ["*", 1.5, SQRT_FRP]], // base 10px
+  ["+", 10, ["*", 1.5, SQRT_FRP]],
   8,
-  ["+", 12, ["*", 2.0, SQRT_FRP]], // base 12px
+  ["+", 12, ["*", 2.0, SQRT_FRP]],
   10,
-  ["+", 14, ["*", 2.8, SQRT_FRP]], // base 14px
+  ["+", 14, ["*", 2.8, SQRT_FRP]],
   12,
-  ["+", 16, ["*", 3.6, SQRT_FRP]], // base 16px
+  ["+", 16, ["*", 3.6, SQRT_FRP]],
   14,
-  ["+", 18, ["*", 4.6, SQRT_FRP]], // base 18px
+  ["+", 18, ["*", 4.6, SQRT_FRP]],
 ];
-/* ======================================================================================== */
+/* ============================================= */
 
-export default function HeatMap() {
+export default function HeatMap({
+  heightClass = "h-[78vh]",
+  showStatus = true,
+}) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [status, setStatus] = useState({
@@ -116,7 +109,6 @@ export default function HeatMap() {
     });
     mapRef.current = map;
 
-    // Controls
     map.addControl(
       new mapboxgl.NavigationControl({ showCompass: true }),
       "top-right"
@@ -126,7 +118,6 @@ export default function HeatMap() {
       new mapboxgl.ScaleControl({ maxWidth: 120, unit: "metric" })
     );
 
-    // Geolocate + blue pin
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
@@ -145,7 +136,10 @@ export default function HeatMap() {
         "space-color": "rgb(11,11,25)",
         "star-intensity": 0.15,
       });
-      map.fitBounds(NA_BOUNDS, { padding: 40, duration: 0 });
+
+      // tighter padding if compact height
+      const pad = heightClass === "h-40" ? 8 : 40;
+      map.fitBounds(NA_BOUNDS, { padding: pad, duration: 0 });
 
       addFireIcon(map);
       addUserPin(map, geolocate, NA_BOUNDS);
@@ -161,9 +155,9 @@ export default function HeatMap() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heightClass]);
 
-  // ================= FIRMS loader =================
   async function loadFirms(map) {
     try {
       let combined = [];
@@ -172,16 +166,13 @@ export default function HeatMap() {
       for (const src of FIRMS_SOURCES) {
         try {
           const url = firmsUrl(src);
-          console.log("[FIRMS] fetching:", src, url);
           const res = await fetch(url);
           if (!res.ok) {
             console.warn(`[FIRMS] ${src} HTTP ${res.status}`);
             continue;
           }
           const text = await res.text();
-          console.log(`[FIRMS] ${src} head:`, text.slice(0, 200));
           const geo = csvToGeoJSON(text);
-          console.log(`[FIRMS] ${src} detections:`, geo.features.length);
           combined = combined.concat(geo.features);
           anyOk = true;
         } catch (e) {
@@ -189,7 +180,7 @@ export default function HeatMap() {
         }
       }
 
-      // De-duplicate by lon/lat/date/time/satellite
+      // Deduplicate
       const seen = new Set();
       const features = [];
       for (const f of combined) {
@@ -204,38 +195,12 @@ export default function HeatMap() {
       }
       const geojson = { type: "FeatureCollection", features };
 
-      // Console logs
-      console.log(
-        `FIRMS detections (multi-sensor, NA, last ${FIRMS_DAYS} day):`,
-        geojson.features.length
-      );
-      geojson.features.forEach((f, i) => {
-        const [lon, lat] = f.geometry.coordinates;
-        console.log(`#${i + 1}`, { lon, lat });
-      });
-      console.table(
-        geojson.features.slice(0, 200).map((f) => {
-          const [lon, lat] = f.geometry.coordinates;
-          const p = f.properties || {};
-          return {
-            lon,
-            lat,
-            date: p.acq_date,
-            time: p.acq_time,
-            conf: p.confidence,
-            frp: p.frp,
-            sat: p.satellite,
-          };
-        })
-      );
-
       setStatus((s) => ({
         ...s,
         firms: anyOk ? "ok" : "error",
         points: geojson.features.length,
       }));
 
-      // Render on map
       if (map.getSource("fires")) map.removeSource("fires");
       map.addSource("fires", {
         type: "geojson",
@@ -246,7 +211,6 @@ export default function HeatMap() {
       });
 
       if (!map.getLayer("fires-clusters")) {
-        // Cluster bubbles
         map.addLayer({
           id: "fires-clusters",
           type: "circle",
@@ -291,8 +255,6 @@ export default function HeatMap() {
           },
           paint: { "text-color": "#1f2937" },
         });
-
-        // 🔥 Intensity circles (now bigger at low FRP)
         map.addLayer({
           id: "fires-intensity",
           type: "circle",
@@ -301,13 +263,11 @@ export default function HeatMap() {
           paint: {
             "circle-color": INTENSITY_COLOR,
             "circle-radius": INTENSITY_RADIUS,
-            "circle-opacity": 0.45, // slightly more visible
+            "circle-opacity": 0.45,
             "circle-stroke-color": INTENSITY_STROKE,
             "circle-stroke-width": 1,
           },
         });
-
-        // Fire icon on top
         map.addLayer({
           id: "fires-unclustered",
           type: "symbol",
@@ -321,7 +281,6 @@ export default function HeatMap() {
           },
         });
 
-        // Interactions
         map.on("click", "fires-clusters", (e) => {
           const f = map.queryRenderedFeatures(e.point, {
             layers: ["fires-clusters"],
@@ -378,57 +337,48 @@ export default function HeatMap() {
     }
   }
 
-  // ================= Current location pin =================
   function addUserPin(map, geolocateControl, bounds = NA_BOUNDS) {
     let userMarker = null;
-
-    function makeMarkerEl() {
-      const el = document.createElement("div");
-      el.innerHTML =
+    function el() {
+      const div = document.createElement("div");
+      div.innerHTML =
         '<span class="block w-3 h-3 rounded-full bg-blue-600 ring-4 ring-white shadow-lg"></span>';
-      const node = el.firstChild;
+      const node = div.firstChild;
       node.style.transform = "translate(-50%, -50%)";
       node.style.cursor = "default";
       return node;
     }
-
-    const insideNA = ([lon, lat]) => {
-      const [w, s, e, n] = bounds;
-      return lon >= w && lon <= e && lat >= s && lat <= n;
-    };
+    const inside = ([lon, lat]) =>
+      lon >= bounds[0] &&
+      lon <= bounds[2] &&
+      lat >= bounds[1] &&
+      lat <= bounds[3];
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
           const pt = [coords.longitude, coords.latitude];
-          if (!insideNA(pt)) return;
-          if (!userMarker) {
-            userMarker = new mapboxgl.Marker({ element: makeMarkerEl() })
+          if (!inside(pt)) return;
+          if (!userMarker)
+            userMarker = new mapboxgl.Marker({ element: el() })
               .setLngLat(pt)
               .addTo(map);
-          } else {
-            userMarker.setLngLat(pt);
-          }
+          else userMarker.setLngLat(pt);
           map.flyTo({ center: pt, zoom: 5, speed: 0.8, essential: true });
         },
-        (err) =>
-          console.warn("Geolocation denied/unavailable:", err?.message || err),
+        () => {},
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
-
     map.on("geolocate", (e) => {
       const pt = [e.coords.longitude, e.coords.latitude];
-      if (!insideNA(pt)) return;
-      if (!userMarker) {
-        userMarker = new mapboxgl.Marker({ element: makeMarkerEl() })
+      if (!inside(pt)) return;
+      if (!userMarker)
+        userMarker = new mapboxgl.Marker({ element: el() })
           .setLngLat(pt)
           .addTo(map);
-      } else {
-        userMarker.setLngLat(pt);
-      }
+      else userMarker.setLngLat(pt);
     });
-
     map.once("load", () => {
       try {
         geolocateControl.trigger();
@@ -436,23 +386,21 @@ export default function HeatMap() {
     });
   }
 
-  // ================= Assets: fire icon =================
   function addFireIcon(map) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-        <defs><radialGradient id="g" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#fff176"/><stop offset="60%" stop-color="#ff9800"/>
-          <stop offset="100%" stop-color="#e65100"/></radialGradient></defs>
-        <path d="M34 6c2 6-2 10-6 14s-8 8-6 14c2 6 10 8 14 6 4-2 6-8 8-12 2-4 4-8 2-12-2-4-8-8-12-10z" fill="url(#g)"/>
-        <path d="M28 26c1 3-1 5-3 7s-4 4-3 7 5 4 7 3c2-1 3-4 4-6 1-2 2-4 1-6-1-2-4-4-6-5z" fill="#fff3e0" opacity=".9"/>
-        <circle cx="32" cy="46" r="10" fill="url(#g)"/>
-      </svg>`;
+      <defs><radialGradient id="g" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#fff176"/><stop offset="60%" stop-color="#ff9800"/>
+        <stop offset="100%" stop-color="#e65100"/></radialGradient></defs>
+      <path d="M34 6c2 6-2 10-6 14s-8 8-6 14c2 6 10 8 14 6 4-2 6-8 8-12 2-4 4-8 2-12-2-4-8-8-12-10z" fill="url(#g)"/>
+      <path d="M28 26c1 3-1 5-3 7s-4 4-3 7 5 4 7 3c2-1 3-4 4-6 1-2 2-4 1-6-1-2-4-4-6-5z" fill="#fff3e0" opacity=".9"/>
+      <circle cx="32" cy="46" r="10" fill="url(#g)"/>
+    </svg>`;
     const img = new Image(64, 64);
     img.onload = () =>
       !map.hasImage("fire-icon") && map.addImage("fire-icon", img);
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   }
 
-  // ================= CSV helpers =================
   function formatTime(hhmm) {
     if (!hhmm) return "-";
     const s = String(hhmm).padStart(4, "0");
@@ -511,26 +459,30 @@ export default function HeatMap() {
   }
 
   return (
-    <div className="p-6 space-y-4 max-w-xl mx-auto">
-      <div className="relative w-full h-[78vh] rounded-2xl overflow-hidden border border-gray-200 shadow">
+    <div className={`p-2 space-y-4 w-full`}>
+      <div
+        className={`relative max-w-md ${heightClass} mx-auto rounded-2xl overflow-hidden border border-gray-200 shadow`}
+      >
         <div ref={containerRef} className="w-full h-full" />
-        <div className="absolute top-2 left-2 text-xs bg-white/85 backdrop-blur rounded-md px-2 py-1 shadow">
-          <span className="mr-2">
-            <b>Token:</b> {String(status.token)}
-          </span>
-          <span className="mr-2">
-            <b>Style:</b> {status.style}
-          </span>
-          <span className="mr-2">
-            <b>FIRMS:</b> {status.firms}
-          </span>
-          <span>
-            <b>Points:</b> {status.points}
-          </span>
-          {status.error && (
-            <span className="ml-2 text-red-600">{status.error}</span>
-          )}
-        </div>
+        {showStatus && (
+          <div className="absolute top-2 left-2 text-xs bg-white/85 backdrop-blur rounded-md px-2 py-1 shadow">
+            <span className="mr-2">
+              <b>Token:</b> {String(status.token)}
+            </span>
+            <span className="mr-2">
+              <b>Style:</b> {status.style}
+            </span>
+            <span className="mr-2">
+              <b>FIRMS:</b> {status.firms}
+            </span>
+            <span>
+              <b>Points:</b> {status.points}
+            </span>
+            {status.error && (
+              <span className="ml-2 text-red-600">{status.error}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

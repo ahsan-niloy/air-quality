@@ -2,10 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useContext } from "react";
 import { AuthContext } from "../Provider/AuthProvider";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import BottomNavbar from "../components/BottomNavbar";
 
 function SignUp() {
   const { user, signUpUser } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const signUp = (e) => {
     e.preventDefault();
@@ -18,7 +20,7 @@ function SignUp() {
     signUpUser(email, password, displayName)
       .then((result) => {
         const loggedUser = result.user;
-        console.log(loggedUser);
+        navigate("/");
         form.reset();
       })
       .catch((error) => {
@@ -44,6 +46,7 @@ function SignUp() {
           </h3>
         </NavLink>
       </div>
+      <BottomNavbar></BottomNavbar>
     </div>
   );
 }
