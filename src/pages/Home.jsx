@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import BottomNavbar from "../components/bottomNavbar";
+import BottomNavbar from "../components/BottomNavbar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useContext } from "react";
 import { AuthContext } from "../Provider/AuthProvider";
