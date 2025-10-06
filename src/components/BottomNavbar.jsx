@@ -15,12 +15,7 @@ import { NavLink } from "react-router-dom";
 const TABS = [
   { key: "home", label: "Home", Outline: Home, Solid: HomeSolid },
   { key: "heatmap", label: "Heat Map", Outline: Earth, Solid: EarthSolid },
-  {
-    key: "aqhistory",
-    label: "AQ History",
-    Outline: Archive,
-    Solid: ArchiveSolid,
-  },
+ 
   { key: "profile", label: "Profile", Outline: User, Solid: UserSolid },
 ];
 
