@@ -1,11 +1,12 @@
 // src/components/HomeContent.jsx
-import { useEffect, useMemo, useState } from "react";
-
-/* -------------- assets for the two buttons --------------
-   Put your PNG/SVGs in /public/ui/ or change these paths.
-----------------------------------------------------------*/
-const ADD_BTN_SRC = "/ui/add_location_btn.svg";
-const EDIT_BTN_SRC = "/ui/edit_location_btn.svg";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import AddLocationImageButton from "@/src/components/AddLocationImageButton";
+import EditLocationsImageButton from "@/src/components/EditLocationsImageButton";
+import { db } from "@/src/Firebase/firebase.init";
+import { loadPlacesDB } from "@/lib/placesStore";
+import { Button } from "@/components/ui/button";
+import { AuthContext } from "@/src/Provider/AuthProvider";
 
 /* ----------------- utilities ----------------- */
 const km = (a, b) => {
@@ -31,13 +32,13 @@ const aqiPill = (a) => {
   if (a <= 300) return "bg-purple-400/80 text-purple-950";
   return "bg-rose-400/80 text-rose-950";
 };
-// AQI → face PNG
+// AQI → face PNG (optional)
 const aqiFace = (a) => {
   if (a == null) return null;
   if (a <= 50) return "aqi_less_than_50.png";
   if (a <= 100) return "aqi_less_than_100.png";
   if (a <= 150) return "aqi_less_than_150.png";
-  return null; // add more ranges if you add files
+  return null;
 };
 
 /* ----------------- API fetchers ----------------- */
@@ -65,7 +66,7 @@ async function fetchAQI(lat, lon, days = 3) {
   return r.json();
 }
 
-/* ----------------- FIRMS helpers ----------------- */
+/* ----------------- FIRMS helpers (soft-fail) ----------------- */
 function parseFirmsCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   const headers = lines[0].split(",");
@@ -133,7 +134,6 @@ function pickIconForDate(w, dateISO) {
     .map((t, idx) => ({ t, idx }))
     .filter((o) => o.t.startsWith(dateISO));
   if (!indices.length) return "clear_day.svg";
-  // pick hour closest to noon
   const targetHour = 12;
   let best = indices[0].idx;
   let bestDiff = Math.abs(new Date(indices[0].t).getHours() - targetHour);
@@ -166,8 +166,6 @@ function DayColumn({ label, aqi, icon, hi, lo }) {
   return (
     <div className="flex flex-col items-center gap-2 px-2">
       <div className="text-base font-semibold text-gray-900">{label}</div>
-
-      {/* AQI pill per your UI tweak */}
       <div
         className={`rounded-full px-2 py-1 text-lg font-semibold ${aqiPill(
           aqi
@@ -175,9 +173,7 @@ function DayColumn({ label, aqi, icon, hi, lo }) {
       >
         {fmtAQI(aqi)}
       </div>
-
       <img src={`/icons/${icon}`} alt="" className="w-9 h-9 mt-1" />
-
       <div className="flex flex-col items-center leading-tight">
         <div className="text-md font-semibold text-gray-900">
           {fmtTemp(hi)}°
@@ -195,7 +191,6 @@ function CityCard({
   currentTemp,
   currentAQI,
   currentIcon,
-  nearbyFires,
 }) {
   const face = aqiFace(currentAQI);
   return (
@@ -206,14 +201,12 @@ function CityCard({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        {/* 3-day columns */}
         <div className="flex-1 grid grid-cols-3 gap-2">
           {cols.map((c) => (
             <DayColumn key={c.label} {...c} />
           ))}
         </div>
 
-        {/* Now panel with AQI face PNG */}
         <div
           className={`w-32 rounded-xl p-3 flex flex-col gap-2 items-center justify-center bg-gray-50 border border-gray-100 ${aqiPill(
             currentAQI
@@ -238,7 +231,7 @@ function CityCard({
             />
           )}
           <div className="flex flex-col items-center">
-            <span className={`px-2 py-1 rounded-lg text-lg font-semibold`}>
+            <span className="px-2 py-1 rounded-lg text-lg font-semibold">
               {fmtAQI(currentAQI)}{" "}
             </span>
             <span className="text-[10px] text-sm opacity-80">US AQI</span>
@@ -249,10 +242,7 @@ function CityCard({
   );
 }
 
-/* ----------------- user places helpers -----------------
-   If the signed-in user has no saved places, we show defaults.
-   This version uses localStorage. Swap for Firestore easily.
-----------------------------------------------------------*/
+/* ----------------- user places ----------------- */
 const DEFAULT_PLACES = [
   {
     name: "Downtown, Kamloops",
@@ -275,67 +265,93 @@ const DEFAULT_PLACES = [
   { name: "Mexico City", subtitle: "Mexico", lat: 19.4326, lon: -99.1332 },
 ];
 
-function loadSavedPlaces() {
-  try {
-    const raw = localStorage.getItem("foreseers_places");
-    const arr = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(arr) && arr.length) return arr;
-  } catch {}
-  return null;
-}
-
 /* ----------------- main component ----------------- */
-function HomeContent({ user }) {
-  // When a user signs in: try to load their saved locations.
-  // If none exist, we’ll use DEFAULT_PLACES.
-  const [places, setPlaces] = useState(
-    () => loadSavedPlaces() || DEFAULT_PLACES
-  );
+export default function HomeContent() {
+  const { user, loading: authLoading } = useContext(AuthContext) || {};
+  const navigate = useNavigate();
 
+  const [places, setPlaces] = useState(DEFAULT_PLACES);
   const [cards, setCards] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true); // <-- separate from auth loading
   const [err, setErr] = useState(null);
 
-  // React to login changes: re-load saved places (or defaults)
-  useEffect(() => {
-    const saved = loadSavedPlaces();
-    setPlaces(saved || DEFAULT_PLACES);
-  }, [user?.uid]);
+  // compute a stable key for fetch dependency (prevents loops)
+  const fetchKey = useMemo(
+    () =>
+      places
+        .map((p) => `${Number(p.lat).toFixed(3)},${Number(p.lon).toFixed(3)}`)
+        .join("|"),
+    [places]
+  );
+  const lastFetchKey = useRef(null);
 
-  // Try to replace the first slot (Kamloops) with current GPS
+  // Load places from Firestore when user changes; fall back to defaults if none
+  useEffect(() => {
+    // Wait for auth to initialize
+    if (authLoading) return;
+
+    (async () => {
+      if (!user?.uid) {
+        setPlaces(DEFAULT_PLACES);
+        return;
+      }
+      try {
+        const fromDB = await loadPlacesDB(db, user.uid); // [{id,name,subtitle,lat,lon}]
+        setPlaces(fromDB.length ? fromDB : DEFAULT_PLACES);
+      } catch (e) {
+        console.error("loadPlacesDB failed:", e);
+        setPlaces(DEFAULT_PLACES);
+      }
+    })();
+  }, [user?.uid, authLoading]);
+
+  // If using defaults, replace first slot with GPS once
+  const gpsReplaced = useRef(false);
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
+    const usingDefaults = places.every((p) => !("id" in p));
+    if (!usingDefaults || gpsReplaced.current) return;
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
+      ({ coords }) => {
+        gpsReplaced.current = true;
         setPlaces((prev) => {
-          // Only replace first slot if the user hasn’t explicitly saved custom places.
-          const isDefault =
-            prev === DEFAULT_PLACES || prev.length === DEFAULT_PLACES.length;
           const copy = [...prev];
-          if (isDefault) {
-            copy[0] = {
-              name: "Your Location",
-              subtitle: "Using device GPS",
-              lat: latitude,
-              lon: longitude,
-            };
-          }
+          copy[0] = {
+            name: "Your Location",
+            subtitle: "Using device GPS",
+            lat: coords.latitude,
+            lon: coords.longitude,
+          };
           return copy;
         });
       },
-      () => {},
+      () => {
+        gpsReplaced.current = true;
+      },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, []);
+  }, [places]);
 
+  // Fetch data for all places (guarded, soft-fail FIRMS)
   useEffect(() => {
+    // prevent duplicate fetches (StrictMode + re-renders)
+    if (lastFetchKey.current === fetchKey) return;
+    lastFetchKey.current = fetchKey;
+
     let cancelled = false;
-    async function run() {
-      setLoading(true);
+
+    (async () => {
+      setDataLoading(true);
       setErr(null);
       try {
-        const fires = await fetchFirmsNorthAmerica();
+        // FIRMS: soft-fail
+        let fires = [];
+        try {
+          fires = await fetchFirmsNorthAmerica();
+        } catch (_e) {
+          // ignore FIRMS failure
+        }
 
         const data = await Promise.all(
           places.map(async (p) => {
@@ -344,7 +360,6 @@ function HomeContent({ user }) {
               fetchAQI(p.lat, p.lon, 3),
             ]);
 
-            // Build 3 vertical "columns": Today + next 2 days
             const cols = [];
             for (let i = 0; i < Math.min(3, w.daily.time.length); i++) {
               const dateISO = w.daily.time[i];
@@ -372,6 +387,9 @@ function HomeContent({ user }) {
               });
             }
 
+            // If you want fires count in UI later:
+            // const nearbyFires = Array.isArray(fires) ? countNearbyFires(fires, p.lat, p.lon, 500) : 0;
+
             return {
               title: p.name,
               subtitle: p.subtitle,
@@ -379,7 +397,6 @@ function HomeContent({ user }) {
               currentTemp: w.current?.temperature_2m ?? null,
               currentAQI: a.current?.us_aqi ?? null,
               currentIcon: pickCurrentIcon(w),
-              nearbyFires: countNearbyFires(fires, p.lat, p.lon, 500),
             };
           })
         );
@@ -388,26 +405,23 @@ function HomeContent({ user }) {
       } catch (e) {
         if (!cancelled) setErr(e.message || String(e));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setDataLoading(false);
       }
-    }
-    run();
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [places]);
+  }, [fetchKey]);
 
   const body = useMemo(() => {
-    if (loading)
+    if (authLoading)
+      return <div className="text-sm text-gray-500">Initializing…</div>;
+    if (dataLoading)
       return <div className="text-sm text-gray-500">Loading data…</div>;
-    if (err)
-      return (
-        <div className="text-sm text-red-600">
-          Error: {err}. Check your <code>VITE_FIRMS_API_KEY</code>.
-        </div>
-      );
+    if (err) return <div className="text-sm text-red-600">Error: {err}.</div>;
     return cards.map((c, i) => <CityCard key={i} {...c} />);
-  }, [cards, loading, err]);
+  }, [cards, authLoading, dataLoading, err]);
 
   return (
     <div className="p-3 mb-10 max-w-xl mx-auto">
@@ -416,23 +430,21 @@ function HomeContent({ user }) {
         Map / Globe goes here
       </div>
 
-      {/* Top action buttons (they'll become components later) */}
+      {/* Top action: show Add/Edit if signed in, otherwise a Sign in button */}
       <div className="flex justify-end items-center gap-3 mb-3">
-        <img
-          src={ADD_BTN_SRC}
-          alt="add location"
-          className="h-9 w-auto cursor-pointer"
-        />
-        <img
-          src={EDIT_BTN_SRC}
-          alt="edit locations"
-          className="h-9 w-auto cursor-pointer"
-        />
+        {user?.uid ? (
+          <>
+            <AddLocationImageButton />
+            <EditLocationsImageButton />
+          </>
+        ) : (
+          <Button onClick={() => navigate("/signin")} className="rounded-full">
+            Sign in
+          </Button>
+        )}
       </div>
 
       {body}
     </div>
   );
 }
-
-export default HomeContent;
